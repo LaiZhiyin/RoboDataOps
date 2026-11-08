@@ -11,5 +11,6 @@
 | 求解未知可能被表格解释为“无改善”或“新增0条” | 反事实非最优保留未知，不作瓶颈结论；无解数量为空，并传递求解状态 | monkeypatch 超时无 incumbent 反例 |
 | 长轨迹将所有向量值展开到 Math.min/max 触发浏览器参数上限 | 循环计算值域与维度，保留非有限值断线 | 浏览器10,000帧×14通道回归 |
 | 网页与README数字容易分叉 | 共用content.json，数字读取实际报告；一致性检查进入CI | tests/test_portfolio.py、build_portfolio.py --check |
+| 首次远端容器构建遇到Debian已存在operator用户组 | 使用项目专用robodataops用户和用户组，继续保持非root运行 | GitHub Actions容器构建与健康启动检查 |
 
 完整的原始现象、可运行测试、修复代码保留在Git版本中。后续真实用户反馈另建立独立记录。
