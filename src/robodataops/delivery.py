@@ -2,7 +2,7 @@
 
 from collections import Counter
 
-from robodataops.contracts import REQUIRED_FIELDS
+from robodataops.contracts import REQUIRED_FIELDS, action_contract
 from robodataops.errors import ValidationError
 from robodataops.metrics import episode_states
 from robodataops.models import canonical_json
@@ -29,6 +29,7 @@ def reconcile(payload, batch, audit, reviews, previous):
         batch.info.get("robot_type", "unknown") != context["robot_type"]
         or batch.info["fps"] != expected_contract["fps"]
         or incoming_features != expected_features
+        or context["data_contract"]["action_semantics"] != action_contract(batch.manifest)
     ):
         raise ValidationError(
             "到货平台、FPS 或必需字段契约与原方案不同，需要显式映射后重新制定计划"

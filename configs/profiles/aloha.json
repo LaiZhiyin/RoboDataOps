@@ -1,0 +1,8 @@
+{
+  "name": "ALOHA simulation compatibility profile",
+  "repo_id": "lerobot/aloha_sim_insertion_human",
+  "state_dimension": 14,
+  "action_dimension": 14,
+  "fps": 50,
+  "action_contract": {"unit": "unknown", "control_mode": "unknown", "coordinate_frame": "unknown", "evidence": "Compatibility is checked against pinned metadata, without inferring control semantics from vector dimensions."}
+}

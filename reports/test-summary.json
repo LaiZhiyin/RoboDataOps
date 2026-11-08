@@ -1,21 +1,30 @@
 {
-  "tests": 52,
+  "release": "1.0.0",
+  "generated_at": "2026-11-08T01:35:24.374253+00:00",
+  "tests": 85,
   "failures": 0,
   "errors": 0,
-  "coverage_percent": 90.44,
+  "skipped": 0,
+  "coverage_percent": 86.57,
+  "oracle_scenarios": 100,
   "public_episodes": 100,
   "public_frames": 16048,
-  "oracle_scenarios": 100,
   "browser": {
+    "release": "1.0.0",
     "desktop_pages": [
       "overview",
       "review",
       "planning",
-      "public-sample"
+      "public-sample",
+      "scenario-save",
+      "video-frame-seek",
+      "cumulative-120"
     ],
     "mobile_width": 390,
     "horizontal_overflow": false,
+    "video_frame_20_seconds": 2,
     "page_errors": [],
-    "note": "Actual browser smoke; no real user study or policy evaluation."
-  }
+    "notice": "Real isolated browser session. No real user study or policy evaluation."
+  },
+  "notice": "Actual local pytest and browser run. Remote CI evidence is linked separately in GitHub Actions. No human or policy effectiveness claim."
 }

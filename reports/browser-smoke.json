@@ -1,12 +1,17 @@
 {
+  "release": "1.0.0",
   "desktop_pages": [
     "overview",
     "review",
     "planning",
-    "public-sample"
+    "public-sample",
+    "scenario-save",
+    "video-frame-seek",
+    "cumulative-120"
   ],
   "mobile_width": 390,
   "horizontal_overflow": false,
+  "video_frame_20_seconds": 2,
   "page_errors": [],
-  "note": "Actual browser smoke; no real user study or policy evaluation."
+  "notice": "Real isolated browser session. No real user study or policy evaluation."
 }

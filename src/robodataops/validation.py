@@ -106,7 +106,7 @@ def run_validation(project: Path, *, scenarios: int = 100) -> dict:
             "notice": "受控合成故障，非真实分布准确率；相关变体不作为独立真实样本",
         }
     public = None
-    for path in (project / "data/raw/libero", project / "data/public_sample"):
+    for path in (project / "data/public_sample", project / "data/raw/libero"):
         if (path / "manifest.json").exists():
             batch = load_batch(path)
             audit = audit_batch(batch)
@@ -195,7 +195,7 @@ def main():
             f"本次实际读取 {public['episodes']} 条完整轨迹、{public['frames']} 帧、{len(public['task_ids'])} 个任务；产生 {public['findings']} 项发现。",
             f"规则分布：`{json.dumps(public['rules'])}`。",
             "",
-            "上述发现未全部获得独立人工确认，不能解释为真实缺陷率。未获取或检查视频。",
+            "上述发现未全部获得独立人工确认，不能解释为真实缺陷率。本报告默认仅检查表格；5段视频证据与其他V1兼容结果另见 v1-evidence.json，未做全量相机验收。",
             "",
         ]
     lines += [

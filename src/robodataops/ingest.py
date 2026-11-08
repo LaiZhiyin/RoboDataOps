@@ -9,7 +9,7 @@ from typing import Any
 
 import pyarrow.parquet as pq
 
-from robodataops.contracts import validate_info
+from robodataops.contracts import action_contract, validate_info
 from robodataops.errors import DataSourceError
 from robodataops.models import Batch, Episode, digest
 
@@ -106,6 +106,7 @@ def load_batch(
     info, tasks, metadata = read_metadata(root)
     manifest_path = safe_path(root, "manifest.json")
     manifest = _json(manifest_path) if manifest_path.exists() else {}
+    action_contract(manifest)
     if not isinstance(manifest.get("files", {}), dict):
         raise DataSourceError("manifest.files 必须是路径到 SHA256 的对象")
     for key in ("repo_id", "revision", "source_kind"):
@@ -173,12 +174,22 @@ def load_batch(
     repo_id = manifest.get("repo_id", "local/unverified")
     revision = manifest.get("revision", "unversioned-local")
     source_kind = manifest.get("source_kind", "local")
+    from robodataops.media import references
+
+    media_hashes = {}
+    for episode in episodes:
+        for ref in references(info, episode.metadata, manifest, root):
+            relative = str(ref.path.relative_to(root))
+            if relative not in media_hashes:
+                media_hashes[relative] = file_sha256(ref.path) if ref.path.exists() else None
     fingerprint = {
         "repo": repo_id,
         "revision": revision,
         "kind": source_kind,
         "info": info,
         "tasks": tasks,
+        "action_contract": action_contract(manifest),
+        "media_files": media_hashes,
         "episodes": [(e.episode_index, e.metadata, e.rows, e.read_error) for e in episodes],
     }
     snapshot_id = digest(fingerprint)

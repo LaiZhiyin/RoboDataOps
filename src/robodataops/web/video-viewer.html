@@ -1,0 +1,46 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box}body{margin:0;color:#193434;font:14px 'Avenir Next','PingFang SC',sans-serif;background:#f4f6f2}.layout{display:grid;grid-template-columns:1fr 1.15fr;gap:18px}.panel{background:white;border:1px solid #d4e0da;border-radius:5px;padding:12px}video{width:100%;max-height:305px;background:#173136;border-radius:3px}h3{font-size:13px;margin:4px 0;color:#395d52}canvas{display:block;width:100%;height:125px}input{width:100%;accent-color:#087f6d}.values{font:12px monospace;overflow-wrap:anywhere;margin:8px 0;min-height:36px}.hint{font-size:12px;color:#4e7064;margin:8px 0}@media(max-width:600px){.layout{grid-template-columns:1fr}canvas{height:100px}video{max-height:230px}}
+</style><div class="layout"><section class="panel"><video id="video" controls preload="metadata" playsinline src="data:video/mp4;base64,__VIDEO__"></video><label for="frame">轨迹帧定位 / Frame</label><input id="frame" type="range" min="0" step="1"><div id="position" class="values"></div><p class="hint">播放与曲线游标按 metadata 映射；物理同步未经验证。</p></section><section class="panel"><h3>Action channels</h3><canvas id="actions"></canvas><div id="action-values" class="values"></div><h3>State channels</h3><canvas id="states"></canvas><div id="state-values" class="values"></div></section></div>
+<script type="application/json" id="source">__DATA__</script>
+<script>
+'use strict';
+const data=JSON.parse(document.getElementById('source').textContent);
+const video=document.getElementById('video'), slider=document.getElementById('frame');
+const palette=['#087f6d','#c8753d','#557ca0','#7d5c93','#a48539','#b86172','#588f83','#596a78'];
+const times=data.timestamps.map((v,i)=>Number.isFinite(v)?v:i/data.fps);
+const origin=times[0]||0;let index=0;
+slider.max=Math.max(0,times.length-1);slider.value=0;
+function draw(id,rows){
+ const canvas=document.getElementById(id),ratio=window.devicePixelRatio||1;
+ const w=Math.max(200,canvas.clientWidth),h=canvas.clientHeight;
+ canvas.width=w*ratio;canvas.height=h*ratio;
+ const c=canvas.getContext('2d');c.scale(ratio,ratio);c.clearRect(0,0,w,h);
+ let lo=Infinity,hi=-Infinity,channels=0;
+ for(const row of rows){if(!Array.isArray(row))continue;channels=Math.max(channels,row.length);
+  for(const value of row){if(Number.isFinite(value)){lo=Math.min(lo,value);hi=Math.max(hi,value);}}}
+ if(!Number.isFinite(lo))return;const span=hi-lo||1;
+ for(let channel=0;channel<channels;channel++){
+  c.beginPath();c.strokeStyle=palette[channel%palette.length];c.lineWidth=1.1;let open=false;
+  rows.forEach((row,i)=>{const value=Array.isArray(row)?row[channel]:null;if(!Number.isFinite(value)){open=false;return;}
+   const x=8+i*(w-16)/Math.max(1,rows.length-1),y=h-8-(value-lo)*(h-16)/span;
+   if(open)c.lineTo(x,y);else c.moveTo(x,y);open=true;});c.stroke();
+ }
+ c.strokeStyle='#193434';c.setLineDash([3,3]);c.beginPath();const x=8+index*(w-16)/Math.max(1,rows.length-1);c.moveTo(x,0);c.lineTo(x,h);c.stroke();
+}
+function render(){
+ slider.value=index;document.getElementById('position').textContent=`Frame ${index} · t=${(times[index]-origin).toFixed(3)}s`;
+ for(const [name,rows] of [['action',data.actions],['state',data.states]]){
+  const values=Array.isArray(rows[index])?rows[index].map(v=>Number.isFinite(v)?v.toFixed(3):'?').join(', '):'unavailable';
+  document.getElementById(`${name}-values`).textContent=values;
+ }draw('actions',data.actions);draw('states',data.states);
+}
+video.addEventListener('loadedmetadata',()=>{video.currentTime=data.start;render();});
+video.addEventListener('timeupdate',()=>{
+ const relative=video.currentTime-data.start+origin;
+ let best=0;for(let i=1;i<times.length;i++)if(Math.abs(times[i]-relative)<Math.abs(times[best]-relative))best=i;
+ index=best;if(video.currentTime>=data.end)video.pause();render();
+});
+slider.addEventListener('input',()=>{index=Number(slider.value);video.currentTime=Math.min(data.end-.001,Math.max(data.start,data.start+times[index]-origin));render();});
+new ResizeObserver(render).observe(document.body);render();
+</script></html>

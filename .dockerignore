@@ -1,0 +1,14 @@
+.git
+.venv
+.cache
+__pycache__
+.pytest_cache
+.ruff_cache
+data/raw
+data/derived
+var
+artifacts
+dist
+site
+*.duckdb
+RoboDataOps_产品方案与验证计划_2026-11-07.md

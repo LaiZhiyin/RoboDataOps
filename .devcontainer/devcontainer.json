@@ -1,0 +1,8 @@
+{
+  "name": "RoboDataOps",
+  "image": "mcr.microsoft.com/devcontainers/python:3.12-bookworm",
+  "forwardPorts": [8501],
+  "portsAttributes": {"8501": {"label": "RoboDataOps workbench", "onAutoForward": "openPreview"}},
+  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y ffmpeg && curl -LsSf https://astral.sh/uv/0.11.8/install.sh | sh && $HOME/.local/bin/uv sync --frozen",
+  "postStartCommand": "ROBODATAOPS_DEMO_MODE=1 $HOME/.local/bin/uv run streamlit run app.py --server.address=0.0.0.0 --server.headless=true > /tmp/robodataops-streamlit.log 2>&1 &"
+}

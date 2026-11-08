@@ -13,7 +13,22 @@ jobs:
           enable-cache: true
       - run: uv python install 3.12
       - run: uv sync --frozen
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - run: uv run --frozen ruff check src app.py tests script
       - run: uv run --frozen ruff format --check src app.py tests script
       - run: uv run --frozen pytest -q --cov=robodataops --cov-fail-under=80
       - run: uv run --frozen python -m robodataops.validation
+      - run: uv run --frozen python script/build_portfolio.py --check
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t robodataops:test .
+      - run: |
+          docker run -d --name robodataops-ci -p 8501:8501 robodataops:test
+          for attempt in $(seq 1 30); do
+            if curl --fail http://127.0.0.1:8501/_stcore/health; then exit 0; fi
+            sleep 2
+          done
+          docker logs robodataops-ci
+          exit 1

@@ -28,6 +28,9 @@ RULES = {
     "R002": "动作变化较低，需要复核",
     "S001": "本地文件不可用或无法解析",
     "V001": "图像验收尚未完成",
+    "V002": "视频区间无法解码",
+    "V003": "视频黑帧或冻结信号需要复核",
+    "V004": "视频区间与轨迹时长不一致",
 }
 
 
@@ -46,6 +49,7 @@ def audit_batch(batch: Batch, profile: RuleProfile | None = None) -> Audit:
         raise ValidationError("时间间隔倍数必须大于 1")
     run_id = digest({"snapshot": batch.snapshot_id, "profile": profile})
     findings = []
+    media_results = {}
     completed = {}
     fps = float(batch.info["fps"])
     global_seen: dict[int, int] = {}
@@ -262,15 +266,58 @@ def audit_batch(batch: Batch, profile: RuleProfile | None = None) -> Audit:
                         )
             except (TypeError, ValueError):
                 pass  # Shape/null defects already have explicit evidence above.
-        if profile.require_video:
-            completed[ep.episode_index] = False
-            add(
-                "V001",
-                "video",
-                "本版未执行完整视频解码与对齐验收",
-                "完成所选图像契约，不能用表格通过代替",
-                review=True,
-            )
+        if profile.video_checks or profile.require_video:
+            from robodataops.media import inspect, references
+
+            refs = references(batch.info, ep.metadata, batch.manifest, batch.root)
+            results = [inspect(ref, full_decode=profile.require_video) for ref in refs]
+            media_results[ep.episode_index] = results
+            for ref in refs:
+                expected_duration = len(rows) / fps
+                if abs((ref.end - ref.start) - expected_duration) > 2 / fps:
+                    add(
+                        "V004",
+                        ref.camera,
+                        {"interval_s": ref.end - ref.start},
+                        {"trajectory_s": expected_duration, "tolerance_s": 2 / fps},
+                        review=True,
+                    )
+            if profile.require_video and (
+                not results or any(r["status"] != "decoded" for r in results)
+            ):
+                completed[ep.episode_index] = False
+                add(
+                    "V001",
+                    "video",
+                    results or "未声明相机",
+                    "所有必需相机在声明区间完整解码；不代表物理同步",
+                    review=True,
+                )
+            for result in results:
+                if result["status"] in {"decode_error", "interval_out_of_bounds", "timeout"}:
+                    add(
+                        "V002",
+                        result["camera"],
+                        result,
+                        "指定区间可解码",
+                        review=not profile.require_video,
+                    )
+                if result["status"] == "decoded" and (
+                    result["black_signal"] or result["freeze_signal"]
+                ):
+                    add(
+                        "V003",
+                        result["camera"],
+                        result,
+                        "抽查信号需结合任务判断，不自动排除静止示范",
+                        review=True,
+                    )
     return Audit(
-        run_id, batch.snapshot_id, profile, findings, completed, time.perf_counter() - started
+        run_id,
+        batch.snapshot_id,
+        profile,
+        findings,
+        completed,
+        time.perf_counter() - started,
+        media_results,
     )

@@ -9,6 +9,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+from robodataops.contracts import action_contract
 from robodataops.demo import default_targets, generate_demo
 from robodataops.errors import RoboDataOpsError, ValidationError
 from robodataops.export import plan_csv, plan_json
@@ -18,6 +19,12 @@ from robodataops.models import RuleProfile, Target, canonical_json, digest, json
 from robodataops.planning import compare_plans, money_to_cents
 from robodataops.quality import audit_batch
 from robodataops.store import Store
+from robodataops.ui_extensions import (
+    cumulative_page,
+    media_panel,
+    scenario_analysis,
+    scenario_loader,
+)
 
 PROJECT = Path(__file__).resolve().parent
 STRATEGY_NAMES = {"equal": "等额预算", "greedy": "收益成本比贪心", "optimal": "整数优化"}
@@ -95,6 +102,8 @@ def target_editor(targets: list[Target], batch) -> list[Target]:
             "cost_yuan": t.cost_cents / 100,
             "capacity": t.capacity,
             "weight": t.weight,
+            "parameter_source": t.parameter_source,
+            "rationale": t.rationale,
         }
         for t in targets
     ]
@@ -116,6 +125,12 @@ def target_editor(targets: list[Target], batch) -> list[Target]:
             "capacity": st.column_config.NumberColumn(
                 "合格交付上限", min_value=0, max_value=100000, step=1
             ),
+            "parameter_source": st.column_config.SelectboxColumn(
+                "参数来源",
+                options=["simulated", "user_input", "historical_estimate"],
+                required=True,
+            ),
+            "rationale": st.column_config.TextColumn("参数依据 / 报价 / 记录"),
             "weight": st.column_config.NumberColumn(
                 "优先权重", min_value=0.0, max_value=100.0, step=0.5
             ),
@@ -134,7 +149,8 @@ def target_editor(targets: list[Target], batch) -> list[Target]:
                 money_to_cents(row["cost_yuan"]),
                 int(row["capacity"]),
                 float(row["weight"]),
-                "simulated",
+                str(row["parameter_source"]),
+                str(row["rationale"] or ""),
             )
         )
     return result
@@ -161,7 +177,7 @@ def render_overview(batch, audit, reviews, targets):
     frame = coverage(batch, audit, reviews, targets)
     with left:
         st.subheader("任务覆盖与当前缺口")
-        st.caption("目标、单价和产能为模拟情景参数，可在补采规划页调整。")
+        st.caption("目标、单价和产能默认模拟；补采规划页可记录参数来源与依据。")
         display_coverage(frame)
     with right:
         st.subheader("各任务验收状态")
@@ -274,9 +290,15 @@ def render_review(batch, audit, reviews, db):
             )
             a, b = st.columns(2)
             a.markdown("**预期条件**")
-            a.json(jsonable(finding.expected), expanded=True)
+            if isinstance(finding.expected, str):
+                a.text(finding.expected)
+            else:
+                a.json(jsonable(finding.expected), expanded=True)
             b.markdown("**实际观测**")
-            b.json(jsonable(finding.observed), expanded=True)
+            if isinstance(finding.observed, str):
+                b.text(finding.observed)
+            else:
+                b.json(jsonable(finding.observed), expanded=True)
             if finding.frame_start is not None:
                 st.caption(
                     f"证据范围：行 {finding.frame_start}–{finding.frame_end}，命中 {finding.hit_count} 处"
@@ -323,10 +345,33 @@ def render_review(batch, audit, reviews, db):
                 chart.columns = [f"action[{i}]" for i in chart.columns]
                 st.line_chart(chart, height=220)
                 st.caption(
-                    "曲线显示维度可读的原始行，缺值或错误维度请以上方证据为准。视频未下载、未做同步验收。"
+                    "曲线显示维度可读的原始行，缺值或错误维度请以上方证据为准。视频按下方 metadata 区间播放；物理同步与任务成功仍需验证。"
                 )
         else:
             st.warning(episode.read_error or "没有可读取的轨迹行。")
+    with st.expander("批量复核与恢复判断"):
+        selected_ids = st.multiselect(
+            "选取当前队列中的发现",
+            [f.finding_id for f in findings],
+            format_func=lambda fid: next(
+                f"EP {f.episode_index} · {f.rule_id}" for f in findings if f.finding_id == fid
+            ),
+        )
+        bulk_decision = st.selectbox("批量决定", list(DECISIONS), format_func=DECISIONS.get)
+        bulk_reason = st.text_input("批量操作理由")
+        a, b = st.columns(2)
+        try:
+            if a.button("应用批量复核"):
+                db.bulk_review(selected_ids, bulk_decision, bulk_reason)
+                st.session_state["_flash"] = "批量复核已追加保存。"
+                st.rerun()
+            if b.button("恢复所选系统判断"):
+                db.bulk_review(selected_ids, "deferred", bulk_reason)
+                st.session_state["_flash"] = "所选结论已恢复为待复核；技术阻断继续生效。"
+                st.rerun()
+        except ValidationError as exc:
+            st.error(str(exc))
+    media_panel(batch, finding.episode_index if findings else None)
     with st.expander("查看追加保存的复核历史"):
         history = db.history(audit.run_id)
         if history:
@@ -339,8 +384,9 @@ def render_planning(batch, audit, reviews, targets, db, target_key):
     if not targets:
         st.warning("尚无可配置目标任务，请先补充任务映射。")
         return
+    scenario_loader(batch, db, target_key)
     st.subheader("采集目标与交付约束")
-    st.caption("数量单位为验收合格 episode；下列目标、单价、产能和权重均为模拟情景输入。")
+    st.caption("数量单位为验收合格 episode。默认参数为模拟情景；改为实际输入时，请填写依据。")
     try:
         targets = target_editor(targets, batch)
         frame = coverage(batch, audit, reviews, targets)
@@ -359,13 +405,14 @@ def render_planning(batch, audit, reviews, targets, db, target_key):
         )
     a, b = st.columns([1, 2])
     budget = a.number_input(
-        "总预算 / 元", min_value=0.0, max_value=1000000.0, value=800.0, step=50.0
+        "总预算 / 元", min_value=0.0, max_value=1000000.0, value=800.0, step=50.0, key="budget-yuan"
     )
     with b:
         st.caption("优化目标：尽量弥补各任务当前缺口的加权比例。允许剩余缺口和预算余款。")
         generate = st.button("生成并保存方案", type="primary", width="stretch")
     context = context_for(batch, audit, reviews, targets)
     budget_cents = money_to_cents(budget)
+    scenario_analysis(targets, tasks, budget_cents, db)
     input_id = digest({"context": context, "tasks": tasks, "budget": budget_cents})
     if generate:
         try:
@@ -465,7 +512,7 @@ def render_planning(batch, audit, reviews, targets, db, target_key):
             st.markdown("**回流验收**")
             st.caption("仅支持同一来源和相同任务定义。原批次与已经登记的轨迹不会重复计功。")
             st.caption(
-                "outstanding 是原方案尚未交付量。更新全部任务覆盖时，请重新导入包含原批次与新增数据的累计快照；本页不自动合并原始文件。"
+                "outstanding 是原方案尚未交付量。更新全部任务覆盖时，可在“累计快照”页生成并切换到派生版本。"
             )
             relative = st.text_input("到货数据目录（相对项目 data 目录）", value="demo")
             if st.button("按此方案验收到货"):
@@ -500,7 +547,7 @@ def main():
             unsafe_allow_html=True,
         )
         page = st.radio(
-            "工作台", ["数据概览", "问题复核", "补采规划"], label_visibility="collapsed"
+            "工作台", ["数据概览", "问题复核", "补采规划", "累计快照"], label_visibility="collapsed"
         )
         st.divider()
         st.caption("当前数据批次")
@@ -508,12 +555,25 @@ def main():
             "合成故障样例": PROJECT / "data/demo",
             "合成干净对照": PROJECT / "data/derived/clean",
         }
-        if (PROJECT / "data/raw/libero/manifest.json").exists():
-            sources["LIBERO 公开样本"] = PROJECT / "data/raw/libero"
-        elif (PROJECT / "data/public_sample/manifest.json").exists():
+        if (PROJECT / "data/public_sample/manifest.json").exists():
             sources["LIBERO 公开样本"] = PROJECT / "data/public_sample"
+        if (PROJECT / "data/aloha_sample/manifest.json").exists():
+            sources["ALOHA 双臂兼容样本"] = PROJECT / "data/aloha_sample"
+        snapshots = (
+            st.session_state.get("_snapshot_paths", [])
+            if os.environ.get("ROBODATAOPS_DEMO_MODE") == "1"
+            else sorted((PROJECT / "data/derived/snapshots").glob("*"))
+        )
+        for snapshot in snapshots:
+            path = Path(snapshot)
+            if (path / "manifest.json").is_file():
+                sources[f"累计 · {path.name[:8]}"] = path
         sources["本地 v3 数据集"] = None
-        source_name = st.selectbox("选择数据", list(sources), label_visibility="collapsed")
+        if "_next_source" in st.session_state:
+            st.session_state["source-selector"] = st.session_state.pop("_next_source")
+        source_name = st.selectbox(
+            "选择数据", list(sources), label_visibility="collapsed", key="source-selector"
+        )
         root = sources[source_name]
         if root is None:
             relative = st.text_input("项目 data 目录内的相对路径", value="raw/libero")
@@ -525,16 +585,23 @@ def main():
             gap = st.number_input(
                 "时间间隔复核倍数", min_value=1.1, max_value=10.0, value=1.8, step=0.1
             )
+            video_checks = st.checkbox("抽查已获取视频", value=False)
+            require_video = st.checkbox("要求所有相机完整区间解码", value=False)
         reload_data = st.button("重新读取并检查", width="stretch")
         st.divider()
         st.caption("验收口径")
         st.markdown("表格技术契约 + 人工复核")
-        st.caption("图像解码、任务成功和策略收益需另行验证。")
+        st.caption("视频解码可选；物理同步、任务成功和策略收益需另行验证。")
         if os.environ.get("ROBODATAOPS_DEMO_MODE") == "1":
             st.caption("演示模式 · 复核与计划仅保留在本会话")
         else:
             st.caption("本地模式 · 复核与方案持久保存")
-    profile = RuleProfile(review_signals=signals, max_gap_factor=gap)
+    profile = RuleProfile(
+        review_signals=signals,
+        max_gap_factor=gap,
+        video_checks=video_checks,
+        require_video=require_video,
+    )
     runtime_key = (str(root), profile.profile_id)
     if reload_data or st.session_state.get("_runtime_key") != runtime_key:
         with st.spinner("读取完整轨迹并生成检查证据…"):
@@ -545,6 +612,8 @@ def main():
     batch, audit, db = st.session_state["_batch"], st.session_state["_audit"], store()
     reviews = db.reviews(audit.run_id)
     target_key = f"targets-{batch.snapshot_id}"
+    if "_next_targets" in st.session_state:
+        st.session_state[target_key] = st.session_state.pop("_next_targets")
     if target_key not in st.session_state:
         ids = sorted({e.task_id for e in batch.episodes if e.task_id in batch.tasks})
         st.session_state[target_key] = default_targets(ids)
@@ -555,6 +624,7 @@ def main():
             "数据概览": "从轨迹证据，到采集决策。",
             "问题复核": "每一项判断，都有依据。",
             "补采规划": "把有限预算，分配给明确缺口。",
+            "累计快照": "每轮到货，让覆盖向前一步。",
         }[page]
     )
     st.caption(
@@ -562,6 +632,7 @@ def main():
             "数据概览": "查看本批次验收状态，识别值得优先处理的任务。",
             "问题复核": "定位原始证据，记录判断与理由，保留完整历史。",
             "补采规划": "调整目标和约束，在相同预算下比较三种方案。",
+            "累计快照": "同源去重、保留血缘，继承未变化证据的人工结论。",
         }[page]
     )
     public = batch.source_kind == "public"
@@ -576,7 +647,7 @@ def main():
         unsafe_allow_html=True,
     )
     st.markdown(
-        '<div class="step-strip">01　数据概览　　/　　02　问题复核　　/　　03　补采规划与导出</div>',
+        '<div class="step-strip">01　数据概览　　/　　02　问题复核　　/　　03　补采规划与导出　　/　　04　累计快照</div>',
         unsafe_allow_html=True,
     )
     if "_flash" in st.session_state:
@@ -585,8 +656,10 @@ def main():
         render_overview(batch, audit, reviews, targets)
     elif page == "问题复核":
         render_review(batch, audit, reviews, db)
-    else:
+    elif page == "补采规划":
         render_planning(batch, audit, reviews, targets, db, target_key)
+    else:
+        cumulative_page(PROJECT, batch, audit, reviews, targets, db)
     with st.expander("数据来源与统计口径"):
         st.json(
             {
@@ -597,8 +670,10 @@ def main():
                 "snapshot": batch.snapshot_id,
                 "rule_profile": jsonable(profile),
                 "run_id": audit.run_id,
+                "action_contract": action_contract(batch.manifest),
+                "video_status": batch.manifest.get("video_status", "not declared"),
                 "acceptance": "必需检查完成，且无仍生效阻断或未决发现；每条轨迹只计一次",
-                "notice": "技术验收与数量覆盖不代表策略表现；所有业务参数为模拟情景。",
+                "notice": "技术验收与数量覆盖不代表策略表现；业务参数来源逐项记录，默认模拟。",
             },
             expanded=False,
         )

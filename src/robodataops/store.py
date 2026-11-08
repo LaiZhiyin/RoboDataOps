@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from functools import wraps
 from pathlib import Path
 from threading import RLock
 
@@ -16,6 +17,16 @@ from robodataops.planning import validate_allocation
 # Separate Streamlit connections can otherwise both observe an empty receipt
 # ledger. The supported local server has one process and serial receipt writes.
 _RECEIPT_LOCK = RLock()
+
+
+def _write_lock(function):
+    @wraps(function)
+    def wrapped(*args, **kwargs):
+        with _RECEIPT_LOCK:
+            return function(*args, **kwargs)
+
+    return wrapped
+
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS schema_version(version INTEGER PRIMARY KEY);
@@ -45,10 +56,16 @@ CREATE TABLE IF NOT EXISTS receipts(
     receipt_id VARCHAR PRIMARY KEY, plan_id VARCHAR NOT NULL REFERENCES plans(plan_id),
     payload VARCHAR NOT NULL, created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE IF NOT EXISTS scenarios(
+    scenario_id VARCHAR PRIMARY KEY, payload VARCHAR NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+INSERT INTO schema_version VALUES (2) ON CONFLICT DO NOTHING;
 """
 
 
 class Store:
+    @_write_lock
     def __init__(self, path: str | Path = ":memory:"):
         if str(path) != ":memory:":
             Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -58,6 +75,7 @@ class Store:
     def close(self) -> None:
         self.connection.close()
 
+    @_write_lock
     def record_audit(self, batch: Batch, audit: Audit) -> None:
         source = {
             "repo_id": batch.repo_id,
@@ -88,6 +106,7 @@ class Store:
             self.connection.execute("ROLLBACK")
             raise
 
+    @_write_lock
     def review(
         self,
         finding_id: str,
@@ -155,6 +174,7 @@ class Store:
         names = [item[0] for item in cursor.description]
         return [dict(zip(names, row, strict=True)) for row in cursor.fetchall()]
 
+    @_write_lock
     def save_plan(self, plan: Plan, tasks: list[PlanningTask], context: dict) -> str:
         if plan.status not in {"optimal", "feasible", "heuristic", "no_gap"}:
             raise ValidationError("没有通过独立可行性验证的方案不能保存")
@@ -250,3 +270,109 @@ class Store:
                 "SELECT payload FROM receipts WHERE plan_id=? ORDER BY created_at", [plan_id]
             ).fetchall()
         ]
+
+    @_write_lock
+    def bulk_review(self, finding_ids: list[str], decision: str, reason: str) -> str:
+        if not finding_ids or len(finding_ids) != len(set(finding_ids)) or len(finding_ids) > 500:
+            raise ValidationError("请选取1–500个不重复的发现")
+        group_id = uuid.uuid4().hex
+        self.connection.execute("BEGIN TRANSACTION")
+        try:
+            for finding_id in finding_ids:
+                self.review(finding_id, decision, reason, event_id=digest([group_id, finding_id]))
+            self.connection.execute("COMMIT")
+        except Exception:
+            self.connection.execute("ROLLBACK")
+            raise
+        return group_id
+
+    def reopen(self, finding_id: str, reason: str):
+        if not isinstance(reason, str) or not reason.strip():
+            raise ValidationError("请填写恢复理由")
+        return self.review(finding_id, "deferred", "恢复系统判断：" + reason)
+
+    @_write_lock
+    def save_scenario(self, text: str) -> str:
+        from robodataops.scenarios import import_scenario
+
+        try:
+            raw = json.loads(text)
+            if not isinstance(raw, dict) or not isinstance(raw.get("targets"), list):
+                raise ValueError("targets")
+            ids = {
+                row["task_id"]
+                for row in raw["targets"]
+                if isinstance(row, dict) and isinstance(row.get("task_id"), str)
+            }
+        except (ValueError, TypeError) as exc:
+            raise ValidationError("情景格式不正确") from exc
+        clean = import_scenario(text, ids)
+        scenario_id = digest(clean)
+        self.connection.execute(
+            "INSERT INTO scenarios VALUES (?, ?, CURRENT_TIMESTAMP) ON CONFLICT DO NOTHING",
+            [scenario_id, canonical_json(clean)],
+        )
+        return scenario_id
+
+    def scenarios(self) -> list[dict]:
+        return [
+            {"scenario_id": row[0], **json.loads(row[1])}
+            for row in self.connection.execute(
+                "SELECT scenario_id,payload FROM scenarios ORDER BY created_at DESC"
+            ).fetchall()
+        ]
+
+    @_write_lock
+    def carry_reviews(self, parents, batch: Batch, audit: Audit) -> int:
+        from robodataops.cumulative import episode_content
+
+        self.record_audit(batch, audit)
+        current = {ep.episode_index: episode_content(ep, batch) for ep in batch.episodes}
+
+        def identity(finding):
+            value = json.loads(canonical_json(finding))
+            value.pop("run_id")
+            value.pop("finding_id")
+            return digest(value)
+
+        new_findings = {identity(f): f.finding_id for f in audit.findings}
+        candidates = {}
+        for parent, old_audit in parents:
+            if old_audit.profile != audit.profile:
+                continue
+            old_reviews = self.reviews(old_audit.run_id)
+            unchanged = {
+                ep.episode_index
+                for ep in parent.episodes
+                if current.get(ep.episode_index) == episode_content(ep, parent)
+            }
+            for finding in old_audit.findings:
+                previous = old_reviews.get(finding.finding_id)
+                target = new_findings.get(identity(finding))
+                if previous and target and finding.episode_index in unchanged:
+                    if (
+                        target in candidates
+                        and candidates[target]["decision"] != previous["decision"]
+                    ):
+                        raise ValidationError("父快照复核结论冲突，需人工重新复核")
+                    candidates[target] = previous
+        existing = self.reviews(audit.run_id)
+        migrated = 0
+        self.connection.execute("BEGIN TRANSACTION")
+        try:
+            for target, previous in candidates.items():
+                if target in existing:
+                    continue
+                self.review(
+                    target,
+                    previous["decision"],
+                    f"继承 {previous['event_id']}：{previous['reason']}",
+                    actor="lineage-carry",
+                    event_id=digest([audit.run_id, previous["event_id"]]),
+                )
+                migrated += 1
+            self.connection.execute("COMMIT")
+        except Exception:
+            self.connection.execute("ROLLBACK")
+            raise
+        return migrated

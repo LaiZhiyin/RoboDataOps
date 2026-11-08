@@ -38,6 +38,12 @@ def _parser() -> argparse.ArgumentParser:
     fetch.add_argument("--tasks", type=int, default=5)
     fetch.add_argument("--per-task", type=int, default=20)
     fetch.add_argument("--seed", type=int, default=42)
+    study = sub.add_parser("evaluate-study", help="汇总匿名真人对照记录；空模板不产生结果")
+    study.add_argument("--input", required=True)
+    study.add_argument("--output", default="reports/user-study.json")
+    merge = sub.add_parser("accumulate", help="生成同源去重的不可变累计分析快照")
+    merge.add_argument("--sources", nargs="+", required=True)
+    merge.add_argument("--output", required=True)
     for command in ("audit", "plan"):
         item = sub.add_parser(command)
         item.add_argument("--source", default=None)
@@ -57,6 +63,21 @@ def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     store = None
     try:
+        if args.command == "evaluate-study":
+            from robodataops.research import summarize_study
+
+            _write(
+                args.output,
+                canonical_json(summarize_study(Path(args.input).read_text(encoding="utf-8-sig"))),
+            )
+            print(f"已生成描述性统计：{args.output}")
+            return 0
+        if args.command == "accumulate":
+            from robodataops.cumulative import accumulate
+
+            merged = accumulate([load_batch(p) for p in args.sources], args.output)
+            print(f"累计 {len(merged.episodes)} 条同源轨迹；快照 {merged.snapshot_id}")
+            return 0
         if args.command == "demo":
             print(generate_demo(args.output, injected=not args.clean))
             return 0
@@ -98,6 +119,7 @@ def main(argv: list[str] | None = None) -> int:
                 "states": episode_states(batch, audit, reviews),
                 "coverage": frame.to_dict("records"),
                 "elapsed_seconds": audit.elapsed_seconds,
+                "media_results": audit.media_results,
                 "notice": "合成测试、公开样本和模拟业务参数分别标记；未验证策略或真实成本收益",
             }
             _write(args.output, canonical_json(report))

@@ -43,6 +43,7 @@ class RuleProfile:
     short_episode_seconds: float = 0.5
     low_motion_threshold: float = 0.00001
     require_video: bool = False
+    video_checks: bool = False
 
     @property
     def profile_id(self) -> str:
@@ -98,6 +99,7 @@ class Audit:
     findings: list[Finding]
     completed: dict[int, bool]
     elapsed_seconds: float = 0.0
+    media_results: dict[int, list[dict]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -108,6 +110,7 @@ class Target:
     capacity: int
     weight: float = 1.0
     parameter_source: str = "simulated"
+    rationale: str = ""
 
 
 @dataclass(frozen=True)

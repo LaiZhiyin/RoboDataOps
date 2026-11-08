@@ -1,0 +1,21 @@
+{
+  "release": "1.0.0",
+  "desktop_width": 1440,
+  "mobile_width": 390,
+  "horizontal_overflow": false,
+  "languages": [
+    "zh",
+    "en"
+  ],
+  "budget_options_checked": [
+    200,
+    800
+  ],
+  "demo_duration_seconds": 89.76,
+  "long_trajectory_render": {
+    "frames": 10000,
+    "channels": 14,
+    "fixture": "synthetic browser rendering regression only"
+  },
+  "page_errors": []
+}

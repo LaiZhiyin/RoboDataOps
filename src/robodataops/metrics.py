@@ -8,6 +8,8 @@ from importlib.resources import files
 import duckdb
 import pandas as pd
 
+from robodataops.contracts import action_contract
+from robodataops.errors import ValidationError
 from robodataops.models import Audit, Batch, PlanningTask, Target, digest
 from robodataops.planning import validate_task_fields
 
@@ -62,6 +64,17 @@ def episode_states(
 
 
 def coverage(batch: Batch, audit: Audit, reviews: dict, targets: list[Target]) -> pd.DataFrame:
+    for target in targets:
+        if not isinstance(target.parameter_source, str) or target.parameter_source not in {
+            "simulated",
+            "user_input",
+            "historical_estimate",
+        }:
+            raise ValidationError("业务参数来源不在支持范围")
+        if not isinstance(target.rationale, str):
+            raise ValidationError("参数依据必须是文本")
+        if target.parameter_source != "simulated" and not target.rationale.strip():
+            raise ValidationError("用户输入或历史估计需要填写依据")
     states = pd.DataFrame(
         episode_states(batch, audit, reviews),
         columns=[
@@ -158,7 +171,7 @@ def context_for(batch: Batch, audit: Audit, reviews: dict, targets: list[Target]
         "data_contract": {
             "fps": batch.info["fps"],
             "features": batch.info["features"],
-            "action_semantics": "unknown; confirm units and control mode before collection",
+            "action_semantics": action_contract(batch.manifest),
         },
         "existing_source_ids": [ep.episode_index for ep in batch.episodes],
         "parameter_notice": "成本、产能与目标均为情景输入；不是实际采集成本或策略效果",
