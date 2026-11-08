@@ -1,6 +1,6 @@
 <!-- Generated from portfolio/content.json. Run script/build_portfolio.py. -->
 
-<img src="site/assets/robodataops-mark.svg" alt="RoboDataOps robot check icon" width="76">
+<img src="site/assets/robodataops-readme-logo.png" alt="RoboDataOps logo" width="400" height="133">
 
 # RoboDataOps
 
