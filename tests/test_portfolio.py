@@ -14,7 +14,7 @@ def test_readme_and_html_preserve_the_same_narrative_and_reported_metrics():
     outputs = module.build_outputs()
     content = json.loads((ROOT / "portfolio/content.json").read_text())
     for lang in ("zh", "en"):
-        readme = outputs[ROOT / ("README.md" if lang == "zh" else "README.en.md")]
+        readme = outputs[ROOT / ("README.zh-CN.md" if lang == "zh" else "README.md")]
         for section in content[lang]["sections"]:
             assert section["title"] in readme
             assert all(p in readme for p in section["paragraphs"])

@@ -1,5 +1,5 @@
 {
-  "release": "1.0.0",
+  "release": "1.1.0",
   "desktop_width": 1440,
   "mobile_width": 390,
   "horizontal_overflow": false,
@@ -7,11 +7,15 @@
     "zh",
     "en"
   ],
+  "default_language": "en",
+  "language_deep_links": true,
+  "history_language_sync": true,
+  "hidden_video_pauses": true,
   "budget_options_checked": [
     200,
     800
   ],
-  "demo_duration_seconds": 89.76,
+  "demo_duration_seconds": 90,
   "long_trajectory_render": {
     "frames": 10000,
     "channels": 14,

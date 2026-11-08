@@ -4,11 +4,12 @@ import uuid
 from pathlib import Path
 
 import pandas as pd
-import streamlit as st
 
 from robodataops.cumulative import accumulate
 from robodataops.errors import RoboDataOpsError
+from robodataops.i18n import tr
 from robodataops.ingest import load_batch, safe_path
+from robodataops.localized_ui import st
 from robodataops.media import inspect, references
 from robodataops.metrics import coverage
 from robodataops.models import Target, canonical_json
@@ -158,7 +159,7 @@ def apply_scenario(value, batch, target_key):
 
 def scenario_analysis(targets, tasks, budget_cents, db):
     with st.expander("情景版本、反事实与成品率敏感性"):
-        name = st.text_input("情景名称", value="本轮预算方案")
+        name = st.text_input("情景名称", value=tr("本轮预算方案"))
         try:
             payload = export_scenario(name, targets, budget_cents)
             a, b = st.columns(2)

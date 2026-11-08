@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.0 — 2026-11-08
+
+- English is now the default workbench, CLI, case-study and repository README language; Chinese is available through the language selector and README.zh-CN.md.
+- Stable widget identities preserve audit settings, reviews, scenarios and budgets across language changes. Raw source text, identifiers, JSON records and downloads remain unchanged.
+- Separate English and Chinese product recordings, captions and play-button thumbnails. The English recording includes an English system-TTS narration.
+- Prominent clickable video headings, thumbnails and direct MP4 links in each README; language-specific video deep links and browser history synchronization.
+- Localization, state-preservation and media-routing regressions added to the existing suite.
+
 ## 1.0.0 — 2026-11-08
 
 - Four-page workbench: audit, evidence review, budget planning and cumulative snapshots.

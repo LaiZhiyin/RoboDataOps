@@ -16,21 +16,40 @@ def main():
         page = browser.new_page(viewport={"width": 1440, "height": 1000})
         page.on("pageerror", lambda error: errors.append(str(error)))
         page.goto("http://127.0.0.1:8765/")
-        assert page.locator("[data-language=zh]").is_visible()
+        assert page.locator("[data-language=en]").first.is_visible()
+        page.locator("[data-language=en] .secondary").click()
         page.locator("#language").click()
-        assert page.locator("[data-language=en]").is_visible()
-        assert page.locator("html").get_attribute("lang") == "en"
+        assert page.locator("[data-language=zh]").first.is_visible()
+        page.go_back()
+        page.wait_for_function("document.documentElement.lang==='en'")
+        assert page.locator("[data-language=en]").first.is_visible()
+        page.go_forward()
+        page.wait_for_function("document.documentElement.lang==='zh-CN'")
         page.locator("#language").click()
         page.locator("#budget").select_option("3")
         assert "0.900" in page.locator("#scenario-results .optimal strong").inner_text()
         page.locator("#budget").select_option("0")
         assert "3.450" in page.locator("#scenario-results .optimal strong").inner_text()
-        video = page.locator("#demo video")
+        video = page.locator("#demo-en")
         video.evaluate(
             "v=>new Promise((resolve,reject)=>{if(v.readyState>=1)resolve();else{v.onloadedmetadata=resolve;v.onerror=()=>reject(new Error('demo video unavailable'));}})"
         )
         duration = video.evaluate("v=>v.duration")
         assert 89 <= duration <= 91, duration
+        video.evaluate("async v=>{v.muted=true;await v.play()}")
+        page.locator("#language").click()
+        assert video.evaluate("v=>v.paused")
+        assert page.locator("#demo-zh").is_visible()
+        chinese = page.locator("#demo-zh")
+        chinese.evaluate(
+            "v=>new Promise(resolve=>{if(v.readyState>=1)resolve();else v.onloadedmetadata=resolve})"
+        )
+        assert 89 <= chinese.evaluate("v=>v.duration") <= 91
+        page.goto("http://127.0.0.1:8765/?lang=zh#demo")
+        assert page.locator("#demo-zh").is_visible()
+        page.goto("http://127.0.0.1:8765/?lang=en#demo")
+        assert page.locator("#demo-en").is_visible()
+        page.goto("http://127.0.0.1:8765/")
         page.screenshot(path=str(ROOT / "docs/images/case-study.png"))
         mobile = browser.new_page(viewport={"width": 390, "height": 844})
         mobile.goto("http://127.0.0.1:8765/")
@@ -51,16 +70,25 @@ def main():
         ).decode()
         fixture = template.replace("__DATA__", json.dumps(data)).replace("__VIDEO__", clip)
         page.set_content(fixture)
-        page.locator("#frame").fill("9999")
+        page.locator("#video").evaluate(
+            "v=>new Promise(resolve=>{if(v.readyState>=1)resolve();else v.onloadedmetadata=resolve})"
+        )
+        # Seek within the short real clip; the 10,000-row fixture tests drawing,
+        # not a claim that this source video contains 200 seconds of evidence.
+        page.locator("#frame").fill("100")
         page.locator("#frame").dispatch_event("input")
-        assert "Frame 9999" in page.locator("#position").inner_text()
+        assert "Frame 100" in page.locator("#position").inner_text()
         assert not errors, errors
         report = {
-            "release": "1.0.0",
+            "release": json.loads((ROOT / "portfolio/content.json").read_text())["version"],
             "desktop_width": 1440,
             "mobile_width": 390,
             "horizontal_overflow": False,
             "languages": ["zh", "en"],
+            "default_language": "en",
+            "language_deep_links": True,
+            "history_language_sync": True,
+            "hidden_video_pauses": True,
             "budget_options_checked": [200, 800],
             "demo_duration_seconds": duration,
             "long_trajectory_render": {

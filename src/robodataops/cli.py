@@ -10,6 +10,7 @@ from pathlib import Path
 from robodataops.demo import default_targets, generate_demo
 from robodataops.errors import RoboDataOpsError
 from robodataops.export import plan_csv, plan_json
+from robodataops.i18n import LANGUAGES, set_language, tr
 from robodataops.ingest import load_batch
 from robodataops.metrics import context_for, coverage, episode_states, planning_tasks
 from robodataops.models import RuleProfile, Target, canonical_json
@@ -28,7 +29,10 @@ def _write(path: str, content: str | bytes) -> None:
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="RoboDataOps 轨迹质检与补采规划")
+    parser = argparse.ArgumentParser(description=tr("RoboDataOps 轨迹质检与补采规划"))
+    parser.add_argument(
+        "--lang", choices=LANGUAGES, default="en", help="Display language (default: en)"
+    )
     sub = parser.add_subparsers(dest="command", required=True)
     demo = sub.add_parser("demo", help="生成明确标记的合成 v3 样例")
     demo.add_argument("--output", default="data/demo")
@@ -56,10 +60,23 @@ def _parser() -> argparse.ArgumentParser:
                 "--strategy", choices=["optimal", "greedy", "equal"], default="optimal"
             )
             item.add_argument("--csv", default="reports/plan.csv")
+    for item in sub.choices.values():
+        item.add_argument(
+            "--lang", choices=LANGUAGES, default=argparse.SUPPRESS, help="Display language"
+        )
+        for action in item._actions:
+            if isinstance(action.help, str):
+                action.help = tr(action.help)
+    for action in sub._choices_actions:
+        action.help = tr(action.help)
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
+    language_parser = argparse.ArgumentParser(add_help=False)
+    language_parser.add_argument("--lang", choices=LANGUAGES, default="en")
+    language_args, _ = language_parser.parse_known_args(argv)
+    set_language(language_args.lang)
     args = _parser().parse_args(argv)
     store = None
     try:
@@ -70,13 +87,13 @@ def main(argv: list[str] | None = None) -> int:
                 args.output,
                 canonical_json(summarize_study(Path(args.input).read_text(encoding="utf-8-sig"))),
             )
-            print(f"已生成描述性统计：{args.output}")
+            print(tr(f"已生成描述性统计：{args.output}"))
             return 0
         if args.command == "accumulate":
             from robodataops.cumulative import accumulate
 
             merged = accumulate([load_batch(p) for p in args.sources], args.output)
-            print(f"累计 {len(merged.episodes)} 条同源轨迹；快照 {merged.snapshot_id}")
+            print(tr(f"累计 {len(merged.episodes)} 条同源轨迹；快照 {merged.snapshot_id}"))
             return 0
         if args.command == "demo":
             print(generate_demo(args.output, injected=not args.clean))
@@ -124,7 +141,9 @@ def main(argv: list[str] | None = None) -> int:
             }
             _write(args.output, canonical_json(report))
             print(
-                f"已检查 {len(batch.episodes)} 条轨迹，生成 {len(audit.findings)} 项发现；报告：{args.output}"
+                tr(
+                    f"已检查 {len(batch.episodes)} 条轨迹，生成 {len(audit.findings)} 项发现；报告：{args.output}"
+                )
             )
         else:
             tasks = planning_tasks(frame)
@@ -139,11 +158,13 @@ def main(argv: list[str] | None = None) -> int:
             _write(args.output, plan_json(payload))
             _write(args.csv, plan_csv(payload))
             print(
-                f"方案 {plan_id}：{plan.message}；预计费用 ¥{plan.spent_cents / 100:.2f}；结果：{args.output}"
+                tr(
+                    f"方案 {plan_id}：{tr(plan.message)}；预计费用 ¥{plan.spent_cents / 100:.2f}；结果：{args.output}"
+                )
             )
         return 0
     except (RoboDataOpsError, OSError, ValueError, TypeError) as exc:
-        print(f"输入或数据错误：{exc}", file=sys.stderr)
+        print(tr(f"输入或数据错误：{tr(str(exc))}"), file=sys.stderr)
         return 2
     finally:
         if store is not None:

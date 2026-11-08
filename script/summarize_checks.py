@@ -10,7 +10,7 @@ suite = ET.parse(root / "reports/junit.xml").getroot().find("testsuite")
 cov = json.loads((root / "reports/coverage.json").read_text())
 validation = json.loads((root / "reports/validation.json").read_text())
 summary = {
-    "release": "1.0.0",
+    "release": json.loads((root / "portfolio/content.json").read_text())["version"],
     "generated_at": datetime.now(UTC).isoformat(),
     "tests": int(suite.attrib["tests"]),
     "failures": int(suite.attrib["failures"]),

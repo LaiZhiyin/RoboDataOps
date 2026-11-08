@@ -31,7 +31,7 @@ def build_outputs() -> dict[Path, str]:
         return html.escape(str(value), quote=True)
 
     pages, outputs = [], {}
-    for lang in ("zh", "en"):
+    for lang in ("en", "zh"):
         text = content[lang]
         metrics = [
             (
@@ -62,8 +62,13 @@ def build_outputs() -> dict[Path, str]:
             "# RoboDataOps",
             f"**{text['tagline']}**",
             text["description"],
-            f"[中文]({repo}/blob/main/README.md) · [English]({repo}/blob/main/README.en.md) · [HTML {version}]({home}) · [GitHub Actions]({repo}/actions) · [Codespaces](https://codespaces.new/laizhiyin/RoboDataOps?quickstart=1)",
-            f"[![{text['video_label']}]({home}assets/video-poster.jpg)]({home}#demo)",
+            f"[English]({repo}/blob/main/README.md) · [中文]({repo}/blob/main/README.zh-CN.md) · [HTML {version}]({home}?lang={lang}) · [GitHub Actions]({repo}/actions) · [Codespaces](https://codespaces.new/laizhiyin/RoboDataOps?quickstart=1)",
+            f"## [▶ {'点击播放产品讲解视频（约90秒）' if lang == 'zh' else 'WATCH THE PRODUCT DEMO — CLICK TO PLAY (~90 seconds)'}]({home}?lang={lang}#demo)",
+            f"[![{'▶ 点击图片播放中文版产品讲解' if lang == 'zh' else '▶ CLICK THIS IMAGE TO PLAY THE ENGLISH PRODUCT WALKTHROUGH'}]({home}assets/video-preview-{lang}.png)]({home}?lang={lang}#demo)",
+            f"**[▶ {'点击这里观看中文版' if lang == 'zh' else 'Click here to watch the English walkthrough'}]({home}?lang={lang}#demo)** · [{'直接打开 MP4 视频' if lang == 'zh' else 'Open the MP4 video directly'}]({home}assets/robodataops-demo-{lang}.mp4)",
+            "点击上方带播放按钮的图片打开视频播放器，再按 ▶ 播放。"
+            if lang == "zh"
+            else "Click the play-button thumbnail above to open the video player, then press ▶. English interface, captions and narration.",
             text["path_label"],
             " | ".join(f"[**{value}** {label}]({url(path)})" for value, label, path in metrics),
             f"[{'验证数字来源' if lang == 'zh' else 'Evidence for metrics'}]({url('reports/test-summary.json')})",
@@ -74,7 +79,8 @@ def build_outputs() -> dict[Path, str]:
             blocks = []
             for item in section.get("items", []):
                 link = f" [{item['label']}]({url(item['href'])})" if "href" in item else ""
-                md.append(f"- **{item['title']}**：{item['body']}{link}")
+                separator = "：" if lang == "zh" else ": "
+                md.append(f"- **{item['title']}**{separator}{item['body']}{link}")
                 anchor = (
                     f'<a href="{esc(url(item["href"]))}">{esc(item["label"])} <span aria-hidden="true">↗</span></a>'
                     if "href" in item
@@ -98,7 +104,7 @@ def build_outputs() -> dict[Path, str]:
             for value, label, path in metrics
         )
         pages.append(
-            f'<div data-language="{lang}" {"hidden" if lang == "en" else ""}><header class="hero"><div class="hero-copy"><span class="eyebrow">EMBODIED DATA / DECISION WORKBENCH · V{version}</span><h1>{esc(text["tagline"])}</h1><p class="lede">{esc(text["description"])}</p><div class="actions"><a class="primary" href="#demo">{esc(text["video_label"])} <span aria-hidden="true">↘</span></a><a class="secondary" href="#engineering-{lang}">{esc(text["code_label"])} ↗</a></div><p class="reading-path">{esc(text["path_label"])}</p><p class="reading-path"><a href="https://codespaces.new/laizhiyin/RoboDataOps?quickstart=1">{"启动完整工作台 / Codespaces ↗" if lang == "zh" else "Launch full workbench / Codespaces ↗"}</a></p></div><figure class="product-shot"><img src="assets/overview.png" alt="RoboDataOps workbench: task coverage and acceptance states" width="1440" height="1100"><figcaption>ACTUAL WORKBENCH / SYNTHETIC FAULT DEMONSTRATION</figcaption></figure></header><div class="metrics">{metrics_html}</div>{"".join(body)}<div class="footer-note">AI-assisted project · MIT code · separately attributed public simulation data · v{version}</div></div>'
+            f'<div data-language="{lang}" {"hidden" if lang == "zh" else ""}><header class="hero"><div class="hero-copy"><span class="eyebrow">EMBODIED DATA / DECISION WORKBENCH · V{version}</span><h1>{esc(text["tagline"])}</h1><p class="lede">{esc(text["description"])}</p><div class="actions"><a class="primary" href="?lang={lang}#demo">▶ {esc(text["video_label"])}</a><a class="secondary" href="#engineering-{lang}">{esc(text["code_label"])} ↗</a></div><p class="reading-path">{esc(text["path_label"])}</p><p class="reading-path"><a href="https://codespaces.new/laizhiyin/RoboDataOps?quickstart=1">{"启动完整工作台 / Codespaces ↗" if lang == "zh" else "Launch full workbench / Codespaces ↗"}</a></p></div><figure class="product-shot"><img src="assets/overview-{lang}.png" alt="RoboDataOps workbench: task coverage and acceptance states" width="1440" height="1100"><figcaption>ACTUAL WORKBENCH / SYNTHETIC FAULT DEMONSTRATION</figcaption></figure></header><div class="metrics">{metrics_html}</div>{"".join(body)}<div class="footer-note">AI-assisted project · MIT code · separately attributed public simulation data · v{version}</div></div>'
         )
         md.extend(
             [
@@ -106,7 +112,9 @@ def build_outputs() -> dict[Path, str]:
                 "以下结果由同一 Python 规划模块预计算；成本与权重均为模拟。网页切换预算不会调用实时后端。"
                 if lang == "zh"
                 else "Precomputed by the same Python planning module. Costs and weights are simulated; changing the web budget does not call a live backend.",
-                "| Budget / 元 | Equal loss | Greedy loss | Optimal loss |",
+                "| 预算 / 元 | 等额预算 L | 贪心 L | 最优 L |"
+                if lang == "zh"
+                else "| Budget / CNY | Equal loss | Greedy loss | Optimal loss |",
                 "|---:|---:|---:|---:|",
             ]
         )
@@ -119,10 +127,14 @@ def build_outputs() -> dict[Path, str]:
                 + " |"
             )
         md.append("\n".join(table))
-        outputs[ROOT / ("README.md" if lang == "zh" else "README.en.md")] = "\n\n".join(md) + "\n"
+        document = "\n\n".join(md) + "\n"
+        outputs[ROOT / ("README.zh-CN.md" if lang == "zh" else "README.md")] = document
+        if lang == "en":
+            outputs[ROOT / "README.en.md"] = document
     template = (ROOT / "portfolio/template.html").read_text()
     outputs[ROOT / "site/index.html"] = (
         template.replace("__PAGES__", "\n".join(pages))
+        .replace("__DEMOS__", demo_sections(version))
         .replace(
             "__SCENARIOS__",
             json.dumps(evidence["scenarios"], ensure_ascii=False).replace("<", "\\u003c"),
@@ -152,11 +164,29 @@ def main():
     for path, text in outputs.items():
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")
-    for image in ("overview.png", "video-poster.jpg"):
+    for image in ("overview.png", "video-poster.jpg", "overview-en.png", "overview-zh.png"):
         source = ROOT / "docs/images" / image
         if source.exists():
             shutil.copyfile(source, ROOT / "site/assets" / image)
     print("Built site/index.html, README.md and README.en.md from portfolio/content.json")
+
+
+def demo_sections(version):
+    result = []
+    for lang in ("en", "zh"):
+        zh = lang == "zh"
+        heading = (
+            "点击播放 · 90秒走完一次决策" if zh else "Click to play · one decision in 90 seconds"
+        )
+        notice = (
+            "中文界面与字幕 · 合成故障和公开仿真；真人及策略收益未验证"
+            if zh
+            else "English interface, captions and narration · synthetic faults and public simulation; user and policy benefits are unverified"
+        )
+        result.append(
+            f'<div data-language="{lang}" {"hidden" if zh else ""}><div class="section-label"><span class="eyebrow">WATCH / ACTUAL PRODUCT</span><h2>{heading}</h2></div><video id="demo-{lang}" controls playsinline preload="metadata" poster="assets/video-preview-{lang}.png" aria-label="{heading}"><source src="assets/robodataops-demo-{lang}.mp4" type="video/mp4"><track kind="captions" src="assets/captions-{lang}.vtt" srclang="{lang}" label="{"中文字幕" if zh else "English captions"}"></video><p class="caption">v{version} · {notice}</p><a class="video-download" href="assets/robodataops-demo-{lang}.mp4">▶ {"直接打开视频 / 下载MP4" if zh else "Open video directly / download MP4"}</a></div>'
+        )
+    return "".join(result)
 
 
 if __name__ == "__main__":

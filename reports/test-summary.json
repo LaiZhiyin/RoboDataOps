@@ -1,16 +1,16 @@
 {
-  "release": "1.0.0",
-  "generated_at": "2026-11-08T01:35:24.374253+00:00",
-  "tests": 85,
+  "release": "1.1.0",
+  "generated_at": "2026-11-08T02:22:43.943699+00:00",
+  "tests": 92,
   "failures": 0,
   "errors": 0,
   "skipped": 0,
-  "coverage_percent": 86.57,
+  "coverage_percent": 87.49,
   "oracle_scenarios": 100,
   "public_episodes": 100,
   "public_frames": 16048,
   "browser": {
-    "release": "1.0.0",
+    "release": "1.1.0",
     "desktop_pages": [
       "overview",
       "review",

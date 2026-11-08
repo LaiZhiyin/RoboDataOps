@@ -7,13 +7,14 @@ from collections import Counter
 from pathlib import Path
 
 import pandas as pd
-import streamlit as st
 
 from robodataops.contracts import action_contract
 from robodataops.demo import default_targets, generate_demo
 from robodataops.errors import RoboDataOpsError, ValidationError
 from robodataops.export import plan_csv, plan_json
+from robodataops.i18n import LANGUAGES, get_language, set_language, tr
 from robodataops.ingest import load_batch, safe_path
+from robodataops.localized_ui import st
 from robodataops.metrics import STATUS_LABELS, context_for, coverage, episode_states, planning_tasks
 from robodataops.models import RuleProfile, Target, canonical_json, digest, jsonable
 from robodataops.planning import compare_plans, money_to_cents
@@ -43,6 +44,7 @@ PLAN_STATUS = {
     "error": "求解错误",
 }
 
+set_language(st.session_state.get("ui-language", "en"))
 st.set_page_config(page_title="RoboDataOps · 数据决策工作台", page_icon="◫", layout="wide")
 st.markdown(
     """
@@ -272,19 +274,21 @@ def render_review(batch, audit, reviews, db):
                 width="stretch",
                 height=300,
             )
+            language = get_language()
             finding_id = st.selectbox(
                 "选择问题",
                 [f.finding_id for f in findings],
                 format_func=lambda value: next(
-                    f"EP {f.episode_index:04d} · {f.rule_id} · {f.title}"
+                    f"EP {f.episode_index:04d} · {f.rule_id} · {tr(f.title, language=language)}"
                     for f in findings
                     if f.finding_id == value
                 ),
+                key="finding-selector",
             )
         finding = next(f for f in findings if f.finding_id == finding_id)
         episode = next(ep for ep in batch.episodes if ep.episode_index == finding.episode_index)
         with right:
-            st.subheader(f"EP {finding.episode_index:04d} · {finding.title}")
+            st.subheader(f"EP {finding.episode_index:04d} · {tr(finding.title)}")
             st.caption(
                 f"字段 {finding.field} · 规则 {finding.rule_id} / {audit.profile.version} · 区间为轨迹内行位置"
             )
@@ -305,9 +309,17 @@ def render_review(batch, audit, reviews, db):
                 )
             with st.form(f"review-{finding.finding_id}"):
                 decision = st.radio(
-                    "复核决定", list(DECISIONS), format_func=DECISIONS.get, horizontal=False
+                    "复核决定",
+                    list(DECISIONS),
+                    format_func=DECISIONS.get,
+                    horizontal=False,
+                    key=f"decision-{finding.finding_id}",
                 )
-                reason = st.text_area("复核理由", placeholder="写明依据、修复建议或需要补充的信息")
+                reason = st.text_area(
+                    "复核理由",
+                    placeholder="写明依据、修复建议或需要补充的信息",
+                    key=f"reason-{finding.finding_id}",
+                )
                 if st.form_submit_button("保存复核决定", type="primary"):
                     try:
                         db.review(finding.finding_id, decision, reason)
@@ -542,12 +554,19 @@ def render_planning(batch, audit, reviews, targets, db, target_key):
 
 def main():
     with st.sidebar:
+        language = st.selectbox(
+            "Language / 语言", list(LANGUAGES), format_func=LANGUAGES.get, key="ui-language"
+        )
+        set_language(language)
         st.markdown(
             '<div class="brand">RoboDataOps<span style="color:#7acdb4"> /</span></div><div class="brand-sub">ROBOT DATA DECISIONS</div>',
             unsafe_allow_html=True,
         )
         page = st.radio(
-            "工作台", ["数据概览", "问题复核", "补采规划", "累计快照"], label_visibility="collapsed"
+            "工作台",
+            ["数据概览", "问题复核", "补采规划", "累计快照"],
+            label_visibility="collapsed",
+            key="page-selector",
         )
         st.divider()
         st.caption("当前数据批次")
@@ -642,12 +661,13 @@ def main():
         "synthetic": "合成干净对照",
         "local": "本地数据 · 来源声明未核验",
     }.get(batch.source_kind, "来源类型未核验")
+    pill = tr(pill)
     st.markdown(
         f'<span class="source-pill {"source-public" if public else ""}">{pill}</span>',
         unsafe_allow_html=True,
     )
     st.markdown(
-        '<div class="step-strip">01　数据概览　　/　　02　问题复核　　/　　03　补采规划与导出　　/　　04　累计快照</div>',
+        f'<div class="step-strip">01　{tr("数据概览")}　　/　　02　{tr("问题复核")}　　/　　03　{tr("补采规划与导出")}　　/　　04　{tr("累计快照")}</div>',
         unsafe_allow_html=True,
     )
     if "_flash" in st.session_state:

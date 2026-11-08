@@ -44,7 +44,7 @@ def test_cli_audit_plan_and_clear_input_errors(tmp_path, capsys):
     bad_config = tmp_path / "bad.json"
     bad_config.write_text("[]")
     assert main(["audit", "--config", str(bad_config)]) == 2
-    assert "错误" in capsys.readouterr().err
+    assert "Input or data error" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize("metadata_has_tasks", [True, False])
