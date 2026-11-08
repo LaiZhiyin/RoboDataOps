@@ -2,6 +2,8 @@
 
 # RoboDataOps
 
+<img src="site/assets/robodataops-logo.svg" alt="RoboDataOps logo" width="420">
+
 **From trajectory evidence to the next collection decision.**
 
 RoboDataOps connects complete-episode evidence, human acceptance decisions, task coverage and limited collection budgets for robotics data leads, operators and ML engineers.
