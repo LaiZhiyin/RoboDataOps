@@ -1,0 +1,53 @@
+{
+  "codebase_version": "v3.0",
+  "robot_type": "synthetic-panda-like",
+  "total_episodes": 100,
+  "total_tasks": 5,
+  "fps": 10.0,
+  "data_path": "data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet",
+  "features": {
+    "observation.state": {
+      "dtype": "float32",
+      "shape": [
+        8
+      ]
+    },
+    "action": {
+      "dtype": "float32",
+      "shape": [
+        7
+      ]
+    },
+    "timestamp": {
+      "dtype": "float32",
+      "shape": [
+        1
+      ]
+    },
+    "frame_index": {
+      "dtype": "int64",
+      "shape": [
+        1
+      ]
+    },
+    "episode_index": {
+      "dtype": "int64",
+      "shape": [
+        1
+      ]
+    },
+    "index": {
+      "dtype": "int64",
+      "shape": [
+        1
+      ]
+    },
+    "task_index": {
+      "dtype": "int64",
+      "shape": [
+        1
+      ]
+    }
+  },
+  "total_frames": 4911
+}

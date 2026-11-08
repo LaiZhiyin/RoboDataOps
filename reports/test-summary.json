@@ -1,0 +1,21 @@
+{
+  "tests": 52,
+  "failures": 0,
+  "errors": 0,
+  "coverage_percent": 90.44,
+  "public_episodes": 100,
+  "public_frames": 16048,
+  "oracle_scenarios": 100,
+  "browser": {
+    "desktop_pages": [
+      "overview",
+      "review",
+      "planning",
+      "public-sample"
+    ],
+    "mobile_width": 390,
+    "horizontal_overflow": false,
+    "page_errors": [],
+    "note": "Actual browser smoke; no real user study or policy evaluation."
+  }
+}

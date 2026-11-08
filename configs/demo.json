@@ -1,0 +1,12 @@
+{
+  "source": "data/demo",
+  "profile": {
+    "name": "tabular-v3",
+    "version": "1.0.0",
+    "timestamp_tolerance": 0.0001,
+    "max_gap_factor": 1.8,
+    "review_signals": true,
+    "require_video": false
+  },
+  "notice": "默认数据为合成故障注入，目标、单价、产能和权重均为模拟业务参数。"
+}
