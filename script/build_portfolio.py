@@ -60,6 +60,7 @@ def build_outputs() -> dict[Path, str]:
         md = [
             "<!-- Generated from portfolio/content.json. Run script/build_portfolio.py. -->",
             "# RoboDataOps",
+            '<img src="site/assets/robodataops-logo.svg" alt="RoboDataOps logo" width="420">',
             f"**{text['tagline']}**",
             text["description"],
             f"[English]({repo}/blob/main/README.md) · [中文]({repo}/blob/main/README.zh-CN.md) · [HTML {version}]({home}?lang={lang}) · [GitHub Actions]({repo}/actions) · [Codespaces](https://codespaces.new/laizhiyin/RoboDataOps?quickstart=1)",
