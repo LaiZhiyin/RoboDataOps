@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 240" role="img" aria-labelledby="title">
+  <title id="title">RoboDataOps robot quality-check logo</title>
+  <g fill="none" stroke="#173d3c" stroke-linecap="round" stroke-linejoin="round" stroke-width="12">
+    <path d="M112 34v25" />
+    <rect x="38" y="58" width="148" height="104" rx="31" />
+    <path d="M38 98H25m161 0h-13" />
+  </g>
+  <circle cx="112" cy="27" r="13" fill="#173d3c" />
+  <circle cx="84" cy="108" r="8" fill="#173d3c" />
+  <circle cx="140" cy="108" r="8" fill="#173d3c" />
+  <circle cx="177" cy="165" r="34" fill="#a4512f" />
+  <path d="m162 165 11 11 20-23" fill="none" stroke="#fffefa" stroke-linecap="round" stroke-linejoin="round" stroke-width="9" />
+  <text x="239" y="153" fill="#173d3c" font-family="Avenir Next, Inter, Arial, sans-serif" font-size="86" font-weight="750" letter-spacing="-3">RoboDataOps</text>
+</svg>
