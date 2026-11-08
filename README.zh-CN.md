@@ -2,6 +2,8 @@
 
 # RoboDataOps
 
+<img src="site/assets/robodataops-logo.svg" alt="RoboDataOps logo" width="420">
+
 **从轨迹证据，到下一轮采集决策。**
 
 RoboDataOps 是面向具身数据负责人、采集团队与算法工程师的数据质检与补采决策工作台：把完整 episode 的证据、人工验收口径、任务缺口和有限预算连接起来。
