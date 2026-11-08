@@ -1,8 +1,8 @@
 <!-- Generated from portfolio/content.json. Run script/build_portfolio.py. -->
 
-# RoboDataOps
+<img src="site/assets/robodataops-mark.svg" alt="RoboDataOps robot check icon" width="76">
 
-<img src="site/assets/robodataops-logo.svg" alt="RoboDataOps logo" width="420">
+# RoboDataOps
 
 **从轨迹证据，到下一轮采集决策。**
 
